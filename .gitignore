@@ -1,0 +1,16 @@
+# python
+__pycache__/
+
+# uv
+.venv/
+
+# node
+node_modules/
+
+# macos
+.DS_Store
+
+# other
+makefile
+configs/
+

@@ -1,0 +1,86 @@
+<ul class="list bg-base-100 rounded-box shadow-md">
+    <li class="p-4 pb-2 text-xs opacity-60 tracking-wide">files</li>
+
+
+    {{ range $index, $file := .Files }}
+    <li class="list-row flex justify-between items-center py-2">
+
+        <!-- delete progress bar -->
+        <div class="absolute left-0 top-0 h-full w-0 bg-error opacity-50 transition-all duration-1000 ease-linear"
+            id="progress-bar-{{ $index }}">
+        </div>
+
+        <!-- filename -->
+        <span>{{ $file }}</span>
+
+        <!-- load and delete button -->
+        <div class="join">
+
+            <!-- load -->
+            <form hx-post="/editor/update" hx-target="#editor" hx-swap="outerHTML">
+                <input type="hidden" name="filename" value="{{ $file }}" />
+                <button class="btn btn-ghost join-item py-0 px-1">
+                    <img src="/static/svg/load.svg" alt="load icon" width="18" height="18">
+                </button>
+            </form>
+
+            <!-- delete -->
+            <form id="delete-form-{{ $index }}">
+                <input type="hidden" name="filename" value="{{ $file }}" />
+            </form>
+
+            <form id="update-editor">
+                <input type="hidden" name="filename" value="" />
+            </form>
+
+            <button class="delete-button btn btn-ghost join-item py-0 px-1" data-index="{{ $index }}">
+                <img src="/static/svg/trash.svg" alt="delete icon" width="18" height="18">
+            </button>
+
+            <div style="display:none;"
+                hx-post="/files/delete"
+                hx-trigger="customDelete from:#delete-form-{{ $index }}"
+                hx-include="#delete-form-{{ $index }}"
+                hx-target="closest li"
+                hx-swap="delete">
+            </div>
+
+            <div style="display:none;"
+                hx-post="/editor/update"
+                hx-trigger="customDelete from:#delete-form-{{ $index }}"
+                hx-include="#update-editor"
+                hx-target="#editor"
+                hx-swap="innerHTML">
+            </div>
+
+        </div>
+    </li>
+    {{ end }}
+
+</ul>
+
+
+<script>
+document.querySelectorAll('.delete-button').forEach(button => {
+    let timer;
+    const index = button.getAttribute('data-index');
+    const progressBar = document.getElementById(`progress-bar-${index}`);
+    const form = document.getElementById(`delete-form-${index}`);
+
+    button.addEventListener('mousedown', () => {
+        progressBar.style.width = '100%';
+        timer = setTimeout(() => {
+            // Dispatch the custom event on the form
+            form.dispatchEvent(new CustomEvent('customDelete', { bubbles: true }));
+        }, 1000);
+    });
+
+    const resetProgress = () => {
+        clearTimeout(timer);
+        progressBar.style.width = '0';
+    };
+
+    button.addEventListener('mouseup', resetProgress);
+    button.addEventListener('mouseleave', resetProgress);
+});
+</script>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="nord">
+    <head>
+        <meta charset="UTF-8">
+        <title>abstractme</title>
+        <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+        <link rel="stylesheet" href="/static/css/output.css">
+    </head>
+    <body>
+
+        <header>
+            <div class="navbar bg-neutral text-neutral-content">
+                <button class="btn btn-ghost text-xl">abstractme</button>
+            </div>
+        </header>
+
+
+        <div class="flex min-h-screen">
+
+            <aside class="w-78 bg-base-200 p-4 pb-0" >
+
+                <div class="w-full" hx-get="/files/get" hx-trigger="load">
+                    {{ template "files.html" . }}
+                </div>
+
+                <div class="py-4"></div>
+
+                <div class="w-full" hx-get="/commands/get" hx-trigger="load">
+                    {{ template "commands.html" . }}
+                </div>
+
+            </aside>
+
+            <main class="w-full p-8">
+
+                {{ template "editor.html" . }}
+
+                <br><br>
+
+                <div id="log"></div>
+
+            </main>
+
+        </div>
+
+    </body>
+</html>

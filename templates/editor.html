@@ -1,0 +1,70 @@
+<form id="editor"
+    hx-post="/files/save"
+    hx-trigger="submit"
+    hx-swap="none"
+    >
+
+    <!-- file input and save -->
+    <div class="fieldset">
+        <div class="join">
+
+            <!-- filename -->
+            <label class="input">
+                <input type="text" name="filename" placeholder="filename" value="{{ .filename }}" />
+                <span class="label">.toml</span>
+            </label>
+
+            <!-- save button -->
+            <button id="save-button" class="btn btn-neutral btn-disabled join-item">
+                save
+            </button>
+
+        </div>
+    </div>
+
+    <!-- text area -->
+    <fieldset class="fieldset">
+        <textarea id="file-content"
+            name="content"
+            class="textarea w-full h-96"
+            placeholder="file content">{{ .content }}</textarea>
+    </fieldset>
+
+</form>
+
+<script>
+// disable save button if pressed
+document.getElementById('save-button').addEventListener('click', function() {
+    this.classList.add('btn-disabled');
+});
+
+// watch for content or filename changes
+function watchForChanges() {
+    let originalContent = document.getElementById('file-content').value;
+    let originalFilename = document.querySelector('input[name="filename"]').value;
+
+    function check() {
+        let currentContent = document.getElementById('file-content').value;
+        let currentFilename = document.querySelector('input[name="filename"]').value;
+
+        if (currentContent !== originalContent || currentFilename !== originalFilename) {
+            document.getElementById('save-button').classList.remove('btn-disabled');
+        } else {
+            document.getElementById('save-button').classList.add('btn-disabled');
+        }
+    }
+
+    document.getElementById('file-content').addEventListener('input', check);
+    document.querySelector('input[name="filename"]').addEventListener('input', check);
+
+    check();
+}
+
+document.addEventListener('DOMContentLoaded', watchForChanges);
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.target?.id === "editor") {
+        watchForChanges();
+    }
+});
+
+</script>

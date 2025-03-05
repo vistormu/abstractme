@@ -1,0 +1,44 @@
+<ul class="list bg-base-100 rounded-box shadow-md">
+    <li class="p-4 pb-2 text-xs opacity-60 tracking-wide">files</li>
+
+
+    {{ range $index, $command := .Commands }}
+    <li class="list-row flex justify-between items-center py-2">
+
+        <!-- delete progress bar -->
+        <div class="absolute left-0 top-0 h-full w-0 bg-error opacity-50 transition-all duration-1000 ease-linear"
+            id="progress-bar-{{ $index }}">
+        </div>
+
+        <!-- filename -->
+        <span>{{ $command }}</span>
+
+        <!-- load and delete button -->
+        <div class="join">
+
+            <!-- run -->
+            <form hx-post="/commands/run"
+                hx-target="#log"
+                hx-swap="beforeend"
+                >
+                <input type="hidden" name="command" value="{{ $command }}" />
+                <button class="btn btn-ghost join-item py-0 px-1">
+                    <img src="/static/svg/run.svg" alt="run icon" width="18" height="18">
+                </button>
+            </form>
+
+            <!-- stop -->
+            <form hx-post="/commands/stop"
+                hx-target="#log"
+                hx-swap="beforeend"
+                >
+                <button class="btn btn-ghost join-item py-0 px-1">
+                    <img src="/static/svg/stop.svg" alt="stop icon" width="18" height="18">
+                </button>
+            </form>
+
+        </div>
+    </li>
+    {{ end }}
+
+</ul>
