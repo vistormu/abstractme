@@ -22,8 +22,10 @@ var (
 const (
     STATIC_DIR = "static"
     TEMPLATES_DIR = "templates"
-    CONFIGS_DIR = "configs"
-    COMMANDS_FILE = "makefile"
+    // CONFIGS_DIR = "configs"
+    CONFIGS_DIR = "../configs"
+    // COMMANDS_FILE = "makefile"
+    COMMANDS_FILE = "../makefile"
 )
 
 func main() {
@@ -89,7 +91,9 @@ func main() {
 
         filenames := []string{}
         for _, file := range files {
-            filenames = append(filenames, file.Name())
+            if strings.HasSuffix(file.Name(), ".toml") {
+                filenames = append(filenames, file.Name())
+            }
         }
 
         c.HTML(http.StatusOK, "files.html", gin.H{"Files": filenames})
@@ -156,6 +160,7 @@ func main() {
         currentCmd = exec.Command("make", recipe)
         currentCmd.Stdout = os.Stdout
         currentCmd.Stderr = os.Stderr
+        currentCmd.Dir = ".."
 
         currentCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 

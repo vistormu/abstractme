@@ -4,13 +4,14 @@
         <meta charset="UTF-8">
         <title>abstractme</title>
         <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+        <script src="https://cdn.jsdelivr.net/npm/theme-change@2.0.2/index.js"></script>
         <link rel="stylesheet" href="/static/css/output.css">
     </head>
     <body>
 
         <header>
             <div class="navbar bg-neutral text-neutral-content">
-                <button class="btn btn-ghost text-xl">abstractme</button>
+                {{ template "header.html" . }}
             </div>
         </header>
 

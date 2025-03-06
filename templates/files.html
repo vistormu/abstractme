@@ -31,27 +31,26 @@
 
             <form id="update-editor">
                 <input type="hidden" name="filename" value="" />
+                <div class="hidden"
+                    hx-post="/files/delete"
+                    hx-trigger="customDelete from:#delete-form-{{ $index }}"
+                    hx-include="#delete-form-{{ $index }}"
+                    hx-target="closest li"
+                    hx-swap="delete">
+                </div>
+
+                <div class="hidden"
+                    hx-post="/editor/update"
+                    hx-trigger="customDelete from:#delete-form-{{ $index }}"
+                    hx-include="#update-editor"
+                    hx-target="#editor"
+                    hx-swap="innerHTML">
+                </div>
             </form>
 
             <button class="delete-button btn btn-ghost join-item py-0 px-1" data-index="{{ $index }}">
                 <img src="/static/svg/trash.svg" alt="delete icon" width="18" height="18">
             </button>
-
-            <div style="display:none;"
-                hx-post="/files/delete"
-                hx-trigger="customDelete from:#delete-form-{{ $index }}"
-                hx-include="#delete-form-{{ $index }}"
-                hx-target="closest li"
-                hx-swap="delete">
-            </div>
-
-            <div style="display:none;"
-                hx-post="/editor/update"
-                hx-trigger="customDelete from:#delete-form-{{ $index }}"
-                hx-include="#update-editor"
-                hx-target="#editor"
-                hx-swap="innerHTML">
-            </div>
 
         </div>
     </li>
