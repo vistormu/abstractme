@@ -9,6 +9,8 @@ import (
 	"strings"
     "sync"
     "syscall"
+    "log"
+    "os/signal"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,12 +25,45 @@ const (
     STATIC_DIR = "static"
     TEMPLATES_DIR = "templates"
     // CONFIGS_DIR = "configs"
-    CONFIGS_DIR = "../configs"
     // COMMANDS_FILE = "makefile"
+    CONFIGS_DIR = "../configs"
     COMMANDS_FILE = "../makefile"
 )
 
+var themes = []string{
+    "light",
+    "nord",
+    "cupcake",
+    "bumblebee",
+    "emerald",
+    
+    "dark",
+    "black",
+    "dracula",
+    "business",
+    "dim",
+
+    "cyberpunk",
+    "retro",
+    "lemonade",
+    "caramellatte",
+    "valentine",
+}
+
 func main() {
+    sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt)
+
+	go func() {
+		<-sigChan
+		cmdLock.Lock()
+		if currentCmd != nil && currentCmd.Process != nil {
+			syscall.Kill(-currentCmd.Process.Pid, syscall.SIGINT)
+		}
+		cmdLock.Unlock()
+		os.Exit(0)
+	}()
+
 	router := gin.Default()
 
     router.Static("/static", STATIC_DIR)
@@ -172,14 +207,16 @@ func main() {
 
         go func(cmd *exec.Cmd) {
             err := currentCmd.Wait()
-            if err != nil {
-                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-                return
-            }
 
             cmdLock.Lock()
+            defer cmdLock.Unlock()
+
             currentCmd = nil
-            cmdLock.Unlock()
+
+            if err != nil {
+                log.Printf("command failed: %s\n", err.Error())
+                return
+            }
         }(currentCmd)
 
         c.JSON(http.StatusOK, gin.H{"message": "command started: " + recipe})
@@ -202,6 +239,13 @@ func main() {
 
         c.JSON(http.StatusOK, gin.H{"message": "command stopped"})
 	})
+
+    // ======
+    // themes
+    // ======
+    router.GET("/themes/get", func(c *gin.Context) {
+        c.HTML(http.StatusOK, "header.html", gin.H{"Themes": themes})
+    })
 
     router.Run(":8080")
 }

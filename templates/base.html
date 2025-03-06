@@ -10,7 +10,9 @@
     <body>
 
         <header>
-            <div class="navbar bg-neutral text-neutral-content">
+            <div class="navbar bg-neutral text-neutral-content"
+                hx-get="/themes/get"
+                hx-trigger="load">
                 {{ template "header.html" . }}
             </div>
         </header>
