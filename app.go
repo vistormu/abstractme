@@ -3,13 +3,19 @@ package main
 import (
 	"net/http"
 	"os"
-	"os/exec"
+    "os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
+    "sync"
+    "syscall"
 
 	"github.com/gin-gonic/gin"
+)
+
+var (
+	currentCmd *exec.Cmd
+	cmdLock sync.Mutex
 )
 
 
@@ -18,11 +24,6 @@ const (
     TEMPLATES_DIR = "templates"
     CONFIGS_DIR = "configs"
     COMMANDS_FILE = "makefile"
-)
-
-var (
-	currentCmd *exec.Cmd
-	currentCmdMutex sync.Mutex
 )
 
 func main() {
@@ -138,69 +139,64 @@ func main() {
     })
 
 	router.POST("/commands/run", func(c *gin.Context) {
-		currentCmdMutex.Lock()
-		defer currentCmdMutex.Unlock()
+        recipe := c.PostForm("command")
+        if recipe == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "command is required"})
+            return
+        }
 
-		// Check if a command is already running.
-		if currentCmd != nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "A command is already running"})
-			return
-		}
+        cmdLock.Lock()
+        defer cmdLock.Unlock()
 
-		// Retrieve the command target from the form.
-		commandName := c.PostForm("command")
-		if commandName == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "No command provided"})
-			return
-		}
+        if currentCmd != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "command is already running"})
+            return
+        }
 
-		// Create the make command.
-		cmd := exec.Command("make", commandName)
-		// (Optional) Set output streams, e.g., cmd.Stdout = os.Stdout, cmd.Stderr = os.Stderr
+        currentCmd = exec.Command("make", recipe)
+        currentCmd.Stdout = os.Stdout
+        currentCmd.Stderr = os.Stderr
 
-		if err := cmd.Start(); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+        currentCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-		// Save the running command.
-		currentCmd = cmd
+        err := currentCmd.Start()
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
 
-		// Wait for the command to finish in a separate goroutine.
-		go func() {
-			err := cmd.Wait()
-			if err != nil {
-				// Optionally log the error.
-			}
-			// Reset currentCmd when finished.
-			currentCmdMutex.Lock()
-			currentCmd = nil
-			currentCmdMutex.Unlock()
-		}()
+        go func(cmd *exec.Cmd) {
+            err := currentCmd.Wait()
+            if err != nil {
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
+            }
 
-		c.JSON(http.StatusOK, gin.H{"message": "Command started"})
+            cmdLock.Lock()
+            currentCmd = nil
+            cmdLock.Unlock()
+        }(currentCmd)
+
+        c.JSON(http.StatusOK, gin.H{"message": "command started: " + recipe})
 	})
 
 	router.POST("/commands/stop", func(c *gin.Context) {
-		currentCmdMutex.Lock()
-		defer currentCmdMutex.Unlock()
+        cmdLock.Lock()
+        defer cmdLock.Unlock()
 
-		if currentCmd == nil {
-			c.JSON(http.StatusOK, gin.H{"message": "No command is running"})
-			return
-		}
+        if currentCmd == nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "no command is running"})
+            return
+        }
 
-		// Kill the process.
-		if err := currentCmd.Process.Kill(); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
+        err := syscall.Kill(-currentCmd.Process.Pid, syscall.SIGINT)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
 
-		// Reset the command since it has been stopped.
-		currentCmd = nil
-		c.JSON(http.StatusOK, gin.H{"message": "Command stopped"})
+        c.JSON(http.StatusOK, gin.H{"message": "command stopped"})
 	})
 
-    // start the server on localhost:8080
     router.Run(":8080")
 }
