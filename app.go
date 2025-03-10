@@ -14,6 +14,7 @@ import (
     "log"
     "os/signal"
     "embed"
+    "io/fs"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,7 +32,7 @@ var templatesFS embed.FS
 
 
 const (
-    VERSION = "0.0.3"
+    VERSION = "0.0.4"
 
     STATIC_DIR = "static"
     TEMPLATES_DIR = "templates"
@@ -59,11 +60,14 @@ var themes = []string{
     "valentine",
 }
 
+
 func main() {
     args := os.Args[1:]
     if len(args) != 1 {
         log.Fatalf("usage: %s <host:port>\n", os.Args[0])
     }
+
+    gin.SetMode(gin.ReleaseMode)
 
     hostPort := args[0]
 
@@ -81,12 +85,14 @@ func main() {
 	}()
 
 	router := gin.Default()
-
-    router.StaticFS("/static", http.FS(staticFS))
-
-	// Parse templates from the embedded filesystem.
-	tmpl := template.Must(template.ParseFS(templatesFS, "templates/*.html"))
+    tmpl := template.Must(template.ParseFS(templatesFS, "templates/*.html"))
     router.SetHTMLTemplate(tmpl)
+
+	subStatic, err := fs.Sub(staticFS, "static")
+	if err != nil {
+		panic(err)
+	}
+	router.StaticFS("/static", http.FS(subStatic))
     
     // ====
     // root
@@ -336,6 +342,5 @@ func main() {
         })
     })
     
-    gin.SetMode(gin.ReleaseMode)
     router.Run(hostPort)
 }
