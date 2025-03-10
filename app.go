@@ -3,6 +3,7 @@ package main
 import (
     "encoding/json"
 	"net/http"
+    "html/template"
 	"os"
     "os/exec"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
     "syscall"
     "log"
     "os/signal"
+    "embed"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,9 +23,15 @@ var (
 	cmdLock sync.Mutex
 )
 
+//go:embed static/*
+var staticFS embed.FS
+
+//go:embed templates/*
+var templatesFS embed.FS
+
 
 const (
-    VERSION = "0.0.2"
+    VERSION = "0.0.3"
 
     STATIC_DIR = "static"
     TEMPLATES_DIR = "templates"
@@ -74,8 +82,11 @@ func main() {
 
 	router := gin.Default()
 
-    router.Static("/static", STATIC_DIR)
-    router.LoadHTMLGlob(filepath.Join(TEMPLATES_DIR, "*"))
+    router.StaticFS("/static", http.FS(staticFS))
+
+	// Parse templates from the embedded filesystem.
+	tmpl := template.Must(template.ParseFS(templatesFS, "templates/*.html"))
+    router.SetHTMLTemplate(tmpl)
     
     // ====
     // root
@@ -324,6 +335,7 @@ func main() {
             "UpdateAvailable": updateAvailable,
         })
     })
-
+    
+    gin.SetMode(gin.ReleaseMode)
     router.Run(hostPort)
 }
