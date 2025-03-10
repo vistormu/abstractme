@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="nord">
+<html lang="en">
     <head>
         <meta charset="UTF-8">
         <title>abstractme</title>
@@ -9,39 +9,36 @@
     </head>
     <body>
 
-        <header>
-            <div class="navbar bg-neutral text-neutral-content"
-                hx-get="/themes/get"
-                hx-trigger="load">
-                {{ template "header.html" . }}
+        <header class="flex items-start gap-8 mt-2">
+            {{ template "header.html" . }}
+
+            <div class="menu bg-info lg:menu-horizontal rounded-box my-2">
+                <li><a id="status" class="menu-title text-info-content">idle</a></li>
             </div>
         </header>
 
-
         <div class="flex min-h-screen">
 
-            <aside class="w-78 bg-base-200 p-4 pb-0" >
+            <aside id="sidebar" class="">
 
-                <div class="w-full" hx-get="/files/get" hx-trigger="load">
+                <!-- files -->
+                <div hx-get="/files/get" 
+                    hx-trigger="load">
                     {{ template "files.html" . }}
                 </div>
 
-                <div class="py-4"></div>
-
-                <div class="w-full" hx-get="/commands/get" hx-trigger="load">
+                <!-- commands -->
+                <div hx-get="/commands/get" 
+                    hx-trigger="load">
                     {{ template "commands.html" . }}
                 </div>
 
+                <!-- settings -->
+                {{ template "settings.html" . }}
             </aside>
 
             <main class="w-full p-8">
-
                 {{ template "editor.html" . }}
-
-                <br><br>
-
-                <div id="log"></div>
-
             </main>
 
         </div>

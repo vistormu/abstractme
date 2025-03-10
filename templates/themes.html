@@ -1,0 +1,14 @@
+{{ range $theme := .Themes }}
+
+<li>
+    <input
+    type="radio"
+    name="theme-dropdown"
+    class="theme-controller w-full btn btn-sm btn-block btn-ghost justify-start"
+    data-set-theme="{{ $theme }}"
+    data-act-class="ACTIVECLASS"
+    aria-label="{{ $theme }}"
+    value="{{ $theme }}" />
+</li>
+
+{{ end }}

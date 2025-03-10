@@ -1,6 +1,7 @@
 package main
 
 import (
+    "encoding/json"
 	"net/http"
 	"os"
     "os/exec"
@@ -22,12 +23,12 @@ var (
 
 
 const (
+    VERSION = "0.0.2"
+
     STATIC_DIR = "static"
     TEMPLATES_DIR = "templates"
-    // CONFIGS_DIR = "configs"
-    // COMMANDS_FILE = "makefile"
-    CONFIGS_DIR = "../configs"
-    COMMANDS_FILE = "../makefile"
+    CONFIGS_DIR = "configs"
+    COMMANDS_FILE = "makefile"
 )
 
 var themes = []string{
@@ -51,6 +52,13 @@ var themes = []string{
 }
 
 func main() {
+    args := os.Args[1:]
+    if len(args) != 1 {
+        log.Fatalf("usage: %s <host:port>\n", os.Args[0])
+    }
+
+    hostPort := args[0]
+
     sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
 
@@ -80,22 +88,29 @@ func main() {
     // editor
     // ======
     router.POST("/editor/update", func(c *gin.Context) {
-        filename := c.PostForm("filename")
+        filename := c.Query("filename")
         content := ""
 
-        if filename != "" {
-            path := filepath.Join(CONFIGS_DIR, filename)
-            contentBytes, err := os.ReadFile(path)
-            if err != nil {
-                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-                return
-            }
-
-            content = string(contentBytes)
+        if filename == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "filename is required"})
+            return
         }
 
+        if !strings.HasSuffix(filename, ".toml") {
+            filename += ".toml"
+        }
+
+        path := filepath.Join(CONFIGS_DIR, filename)
+        contentBytes, err := os.ReadFile(path)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+
+        content = string(contentBytes)
+
         response := map[string]string{
-            "filename": filename,
+            "filename": strings.TrimSuffix(filename, ".toml"),
             "content": content,
         }
 
@@ -127,7 +142,7 @@ func main() {
         filenames := []string{}
         for _, file := range files {
             if strings.HasSuffix(file.Name(), ".toml") {
-                filenames = append(filenames, file.Name())
+                filenames = append(filenames, strings.TrimSuffix(file.Name(), ".toml"))
             }
         }
 
@@ -149,7 +164,7 @@ func main() {
             return
         }
 
-        c.JSON(http.StatusOK, gin.H{"message": "File saved successfully"})
+        c.Redirect(http.StatusSeeOther, "/files/get")
     })
 
 
@@ -178,9 +193,12 @@ func main() {
     })
 
 	router.POST("/commands/run", func(c *gin.Context) {
-        recipe := c.PostForm("command")
+        recipe := c.Query("command")
         if recipe == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "command is required"})
+            c.HTML(http.StatusBadRequest, "status.html", gin.H{
+                "Status": "error",
+                "Message": "no command provided",
+            })
             return
         }
 
@@ -188,20 +206,25 @@ func main() {
         defer cmdLock.Unlock()
 
         if currentCmd != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "command is already running"})
+            c.HTML(http.StatusBadRequest, "status.html", gin.H{
+                "Status": "error",
+                "Message": "command is already running",
+            })
             return
         }
 
         currentCmd = exec.Command("make", recipe)
         currentCmd.Stdout = os.Stdout
         currentCmd.Stderr = os.Stderr
-        currentCmd.Dir = ".."
 
         currentCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
         err := currentCmd.Start()
         if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            c.HTML(http.StatusInternalServerError, "status.html", gin.H{
+                "Status": "error",
+                "Message": err.Error(),
+            })
             return
         }
 
@@ -219,7 +242,10 @@ func main() {
             }
         }(currentCmd)
 
-        c.JSON(http.StatusOK, gin.H{"message": "command started: " + recipe})
+        c.HTML(http.StatusOK, "status.html", gin.H{
+            "Status": "success",
+            "Message": "command started: " + recipe,
+        })
 	})
 
 	router.POST("/commands/stop", func(c *gin.Context) {
@@ -227,25 +253,77 @@ func main() {
         defer cmdLock.Unlock()
 
         if currentCmd == nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "no command is running"})
+            c.HTML(http.StatusBadRequest, "status.html", gin.H{
+                "Status": "error",
+                "Message": "no command is running",
+            })
             return
         }
 
         err := syscall.Kill(-currentCmd.Process.Pid, syscall.SIGINT)
         if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            c.HTML(http.StatusInternalServerError, "status.html", gin.H{
+                "Status": "error",
+                "Message": err.Error(),
+            })
             return
         }
 
-        c.JSON(http.StatusOK, gin.H{"message": "command stopped"})
+        currentCmd = nil
+
+        c.HTML(http.StatusOK, "status.html", gin.H{
+            "Status": "error",
+            "Message": "command stopped",
+        })
 	})
 
     // ======
     // themes
     // ======
     router.GET("/themes/get", func(c *gin.Context) {
-        c.HTML(http.StatusOK, "header.html", gin.H{"Themes": themes})
+        c.HTML(http.StatusOK, "themes.html", gin.H{"Themes": themes})
     })
 
-    router.Run(":8080")
+    // =======
+    // updates
+    // =======
+    router.GET("/update/check", func(c *gin.Context) {
+        apiURL := "https://api.github.com/repos/vistormu/abstractme/releases/latest"
+        resp, err := http.Get(apiURL)
+        if err != nil {
+            log.Printf("failed to query GitHub: %s\n", err.Error())
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to query GitHub: " + err.Error()})
+            return
+        }
+        defer resp.Body.Close()
+
+        if resp.StatusCode != http.StatusOK {
+            log.Printf("unexpected GitHub response: %s\n", resp.Status)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "unexpected GitHub response: " + resp.Status})
+            return
+        }
+
+        // Define a struct for parsing the JSON response
+        var release struct {
+            TagName     string `json:"tag_name"`
+            Body        string `json:"body"`
+            PublishedAt string `json:"published_at"`
+        }
+
+        if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+            log.Printf("failed to decode GitHub response: %s\n", err.Error())
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to decode GitHub response: " + err.Error()})
+            return
+        }
+
+        // Remove any "v" prefix from the tag (if present) so that "v0.1.0" and "0.1.0" are considered the same.
+        latestVersion := strings.TrimPrefix(release.TagName, "v")
+        updateAvailable := latestVersion != VERSION
+
+        c.HTML(http.StatusOK, "update-button.html", gin.H{
+            "UpdateAvailable": updateAvailable,
+        })
+    })
+
+    router.Run(hostPort)
 }
